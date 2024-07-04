@@ -3,6 +3,7 @@ from tkinter import ttk
 import serial
 import threading
 from datetime import datetime
+import serial.tools.list_ports
 
 class SerialDebugger:
     FRAME_TYPE_MAP = {
@@ -64,8 +65,11 @@ class SerialDebugger:
                     frame_type = int(frame[12:14], 16)
                     frame_data = frame[14:end_index].upper()
                     spaced_frame_data = ' '.join(frame_data[i:i+2] for i in range(0, len(frame_data), 2))
-                    self.update_treeview(slot_num, frame_type, spaced_frame_data)
-                    self.update_data_treeview(slot_num, frame_type, spaced_frame_data)
+                    
+                    if frame_type in (0,1,4,5):
+                        self.update_treeview(slot_num, frame_type, spaced_frame_data)
+                    if frame_type in (2,3):
+                        self.update_data_treeview(slot_num, frame_type, spaced_frame_data)
 
                     buffer = buffer[end_index:]
 
@@ -117,63 +121,76 @@ class SerialDebuggerGUI:
 
         self.port_label = tk.Label(root, text="Serial Port:")
         self.port_label.grid(row=0, column=0, sticky='ew')
-        self.port_entry = tk.Entry(root)
-        self.port_entry.grid(row=0, column=1, sticky='ew')
+        self.port_combobox = ttk.Combobox(root)
+        self.port_combobox.grid(row=0, column=1, sticky='ew')
+        self.refresh_button = tk.Button(root, text="Refresh", command=self.refresh_ports)
+        self.refresh_button.grid(row=0, column=2, sticky='ew')
 
         self.baudrate_label = tk.Label(root, text="Baudrate:")
         self.baudrate_label.grid(row=1, column=0, sticky='ew')
-        self.baudrate_entry = tk.Entry(root)
-        self.baudrate_entry.grid(row=1, column=1, sticky='ew')
+                # Change from tk.Entry to ttk.Combobox
+        self.baudrate_combobox = ttk.Combobox(root, values=["9600", "19200", "38400", "57600", "115200"])
+        self.baudrate_combobox.grid(row=1, column=1, columnspan=2, sticky='ew')
+        self.baudrate_combobox.set("115200")  # Set a default value
 
         self.connect_button = tk.Button(root, text="Connect", command=self.toggle_connection)
-        self.connect_button.grid(row=2, column=0, columnspan=2, sticky='ew')
+        self.connect_button.grid(row=2, column=0, columnspan=3, sticky='ew')
 
         self.treeview = ttk.Treeview(root, columns=("Slot", "Frame Type", "Data"), show="headings")
         self.treeview.heading("Slot", text="Slot")
         self.treeview.heading("Frame Type", text="Frame Type")
         self.treeview.heading("Data", text="Data")
-        self.treeview.column("Slot", width=100)  # 固定 Slot 列宽度
-        self.treeview.column("Frame Type", width=100)  # 固定 Frame Type 列宽度
-        self.treeview.column("Data", width=600)  # 固定 Data 列宽度
-        self.treeview.grid(row=3, column=0, columnspan=2, sticky="nsew")
+        self.treeview.column("Slot", width=100)
+        self.treeview.column("Frame Type", width=100)
+        self.treeview.column("Data", width=600)
+        self.treeview.grid(row=3, column=0, columnspan=3, sticky="nsew")
 
         self.data_treeview = ttk.Treeview(root, columns=("Timestamp", "Slot", "Frame Type", "Data"), show="headings")
         self.data_treeview.heading("Timestamp", text="Timestamp")
         self.data_treeview.heading("Slot", text="Slot")
         self.data_treeview.heading("Frame Type", text="Frame Type")
         self.data_treeview.heading("Data", text="Data")
-        self.data_treeview.column("Timestamp", width=100)  # 固定 Timestamp 列宽度
-        self.data_treeview.column("Slot", width=100)  # 固定 Slot 列宽度
-        self.data_treeview.column("Frame Type", width=100)  # 固定 Frame Type 列宽度
-        self.data_treeview.column("Data", width=600)  # 固定 Data 列宽度
-        self.data_treeview.grid(row=4, column=0, columnspan=2, sticky="nsew")
+        self.data_treeview.column("Timestamp", width=100)
+        self.data_treeview.column("Slot", width=100)
+        self.data_treeview.column("Frame Type", width=100)
+        self.data_treeview.column("Data", width=600)
+        self.data_treeview.grid(row=4, column=0, columnspan=3, sticky="nsew")
 
         self.input_label = tk.Label(root, text="Send Data:")
         self.input_label.grid(row=5, column=0, sticky='ew')
         self.input_entry = tk.Entry(root)
-        self.input_entry.grid(row=5, column=1, sticky='ew')
+        self.input_entry.grid(row=5, column=1, columnspan=2, sticky='ew')
 
         self.send_button = tk.Button(root, text="Send", command=self.send_data)
-        self.send_button.grid(row=6, column=0, columnspan=2, sticky='ew')
+        self.send_button.grid(row=6, column=0, columnspan=3, sticky='ew')
 
-        # Configure grid weights
         root.grid_rowconfigure(3, weight=1)
         root.grid_rowconfigure(4, weight=1)
         root.grid_columnconfigure(0, weight=1)
         root.grid_columnconfigure(1, weight=1)
+        root.grid_columnconfigure(2, weight=1)
 
         self.debugger = None
 
         # Bind the <Configure> event to adjust column widths
         root.bind('<Configure>', self.on_resize)
 
+        self.refresh_ports()
+
+    def refresh_ports(self):
+        ports = serial.tools.list_ports.comports()
+        port_list = [port.device for port in ports]
+        self.port_combobox['values'] = port_list
+        if port_list:
+            self.port_combobox.current(0)
+
     def toggle_connection(self):
         if self.debugger and self.debugger.running:
             self.debugger.stop()
             self.connect_button.config(text="Connect")
         else:
-            port = self.port_entry.get()
-            baudrate = int(self.baudrate_entry.get())
+            port = self.port_combobox.get()
+            baudrate = self.baudrate_combobox.get()
             self.debugger = SerialDebugger(port, baudrate, self.treeview, self.data_treeview)
             self.debugger.start()
             self.connect_button.config(text="Disconnect")
@@ -190,7 +207,7 @@ class SerialDebuggerGUI:
             self.data_treeview.delete(item)
 
     def on_resize(self, event):
-        new_width = (event.width - 216) // 2  # 100 for Slot column width + 100 for Frame Type column width + 16 for scrollbar width
+        new_width = event.width - 300 
         self.treeview.column("Data", width=new_width)
         self.data_treeview.column("Data", width=new_width)
 
