@@ -19,17 +19,17 @@ class SerialDebugger:
             self.serial_connection = serial.Serial(self.port, self.baudrate, timeout=1)
             self.running = True
             threading.Thread(target=self.read_from_port).start()
-            self.treeview.insert("", tk.END, values=("Info", f"Connected to {self.port} at {self.baudrate} baudrate"))
+            # self.treeview.insert("", tk.END, values=("Info", f"Connected to {self.port} at {self.baudrate} baudrate"))
             self.log_to_file("Info", f"Connected to {self.port} at {self.baudrate} baudrate")
         except Exception as e:
-            self.treeview.insert("", tk.END, values=("Error", f"Error opening serial port: {e}"))
+            # self.treeview.insert("", tk.END, values=("Error", f"Error opening serial port: {e}"))
             self.log_to_file("Error", f"Error opening serial port: {e}")
 
     def stop(self):
         self.running = False
         if self.serial_connection and self.serial_connection.is_open:
             self.serial_connection.close()
-            self.treeview.insert("", tk.END, values=("Info", f"Disconnected from {self.port}"))
+            # self.treeview.insert("", tk.END, values=("Info", f"Disconnected from {self.port}"))
             self.log_to_file("Info", f"Disconnected from {self.port}")
 
     def read_from_port(self):
@@ -66,7 +66,7 @@ class SerialDebugger:
         if slot_num in self.treeview_rows:
             self.treeview.item(self.treeview_rows[slot_num], values=(slot_num, hex_data))
         else:
-            row_id = self.treeview.insert("", tk.END, values=(slot_num, hex_data))
+            row_id = self.treeview.insert("", slot_num, values=(slot_num, hex_data))
             self.treeview_rows[slot_num] = row_id
 
         self.log_to_file(slot_num, hex_data, timestamp)
@@ -74,9 +74,12 @@ class SerialDebugger:
     def write_to_port(self, data):
         if self.serial_connection and self.serial_connection.is_open:
             data_without_spaces = data.replace(" ", "")
-            self.serial_connection.write(data_without_spaces.encode('utf-8'))
-            # self.treeview.insert("", tk.END, values=("Sent", data))
-            self.log_to_file("Sent", data_without_spaces)
+            # 将十六进制字符串转换为字节数据
+            data_bytes = bytes.fromhex(data_without_spaces)
+            slot_num = 0
+            self.serial_connection.write(data_bytes)
+            self.update_treeview(slot_num, data)
+            # self.log_to_file("Sent", data_without_spaces)
 
     def log_to_file(self, slot, data, timestamp=None):
         if not timestamp:
@@ -106,6 +109,7 @@ class SerialDebuggerGUI:
         self.treeview.heading("Slot", text="Slot")
         self.treeview.heading("Data", text="Data")
         self.treeview.column("Slot", width=100)  # 固定 Slot 列宽度
+        self.treeview.column("Data", width=600)  # 固定 Slot 列宽度
         self.treeview.grid(row=3, column=0, columnspan=2, sticky="nsew")
 
         self.input_label = tk.Label(root, text="Send Data:")
@@ -115,6 +119,10 @@ class SerialDebuggerGUI:
 
         self.send_button = tk.Button(root, text="Send", command=self.send_data)
         self.send_button.grid(row=5, column=0, columnspan=2, sticky='ew')
+
+        # FIXME: Add clear button
+        # self.clear_button = tk.Button(root, text="Clear", command=self.clear_treeview)
+        # self.clear_button.grid(row=6, column=0, columnspan=2, sticky='ew')
 
         # Configure grid weights
         root.grid_rowconfigure(3, weight=1)
@@ -141,6 +149,10 @@ class SerialDebuggerGUI:
         data = self.input_entry.get()
         if self.debugger:
             self.debugger.write_to_port(data)
+
+    def clear_treeview(self):
+        for item in self.treeview.get_children():
+            self.treeview.delete(item)
 
     def on_resize(self, event):
         # Get the new width of the treeview
