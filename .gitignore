@@ -1,2 +1,4 @@
 back.py
 serial_log.txt
+build/
+dist/

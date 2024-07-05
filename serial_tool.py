@@ -63,7 +63,7 @@ class SerialDebugger:
                     frame = buffer[start_index:end_index]
                     slot_num = int(frame[10:12], 16)
                     frame_type = int(frame[12:14], 16)
-                    frame_data = frame[14:end_index].upper()
+                    frame_data = frame[14:end_index - 2].upper()
                     spaced_frame_data = ' '.join(frame_data[i:i+2] for i in range(0, len(frame_data), 2))
                     
                     if frame_type in (0,1,4,5):
@@ -93,6 +93,7 @@ class SerialDebugger:
         else:
             row_id = self.data_treeview.insert("", slot_num, values=(timestamp, slot_num, frame_type_text, hex_data))
             self.data_treeview_rows[slot_num] = row_id
+        self.log_to_file(slot_num, f"Type: {frame_type_text}, Data: {hex_data}", timestamp)
 
     def write_to_port(self, data):
         if self.serial_connection and self.serial_connection.is_open:
@@ -128,10 +129,9 @@ class SerialDebuggerGUI:
 
         self.baudrate_label = tk.Label(root, text="Baudrate:")
         self.baudrate_label.grid(row=1, column=0, sticky='ew')
-                # Change from tk.Entry to ttk.Combobox
         self.baudrate_combobox = ttk.Combobox(root, values=["9600", "19200", "38400", "57600", "115200"])
         self.baudrate_combobox.grid(row=1, column=1, columnspan=2, sticky='ew')
-        self.baudrate_combobox.set("115200")  # Set a default value
+        self.baudrate_combobox.set("115200")  
 
         self.connect_button = tk.Button(root, text="Connect", command=self.toggle_connection)
         self.connect_button.grid(row=2, column=0, columnspan=3, sticky='ew')
