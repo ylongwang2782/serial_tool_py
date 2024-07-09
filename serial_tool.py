@@ -12,7 +12,7 @@ class SerialDebugger:
         1: "入网回复帧",
         2: "数据帧",
         3: "阻抗帧",
-        4: "命令帧",
+        4: "指令帧",
         5: "命令回复帧",
     }
 
@@ -214,23 +214,28 @@ class SerialDebuggerGUI:
         self.data_treeview.heading("Timestamp", text="Timestamp")
         self.data_treeview.heading("Slot", text="Slot")
         self.data_treeview.heading("Frame Type", text="Frame Type")
-        self.data_treeview.heading("PinNum", text="PinNum")  # 添加 PinNum 列的标题
-        self.data_treeview.heading("Status", text="Status")  # 添加 PinNum 列的标题
+        self.data_treeview.heading("PinNum", text="PinNum")
+        self.data_treeview.heading("Status", text="Status")
         self.data_treeview.heading("Data", text="Data")
         self.data_treeview.column("Timestamp", width=100)
         self.data_treeview.column("Slot", width=100)
         self.data_treeview.column("Frame Type", width=100)
-        self.data_treeview.column("PinNum", width=100)  # 设置 PinNum 列的宽度
-        self.data_treeview.column("Status", width=100)  # 设置 PinNum 列的宽度
+        self.data_treeview.column("PinNum", width=100)
+        self.data_treeview.column("Status", width=100)
         self.data_treeview.column("Data", width=600)
         self.data_treeview.grid(row=4, column=0, columnspan=3, sticky="nsew")
 
         self.input_label = tk.Label(root, text="Send Data:")
         self.input_label.grid(row=5, column=0, sticky="ew")
-        self.input_entry = tk.Entry(root)
-        self.input_entry.grid(row=5, column=1, columnspan=2, sticky="ew")
 
-        self.send_button = tk.Button(root, text="Send", command=self.send_data)
+        self.frame_send_combobox = ttk.Combobox(root, values=["广播帧", "指令帧"])
+        self.frame_send_combobox.grid(row=5, column=0, columnspan=1, sticky="ew")
+        self.frame_send_combobox.set("广播帧")
+
+        self.frame_send_input_entry = tk.Entry(root)
+        self.frame_send_input_entry.grid(row=5, column=1, columnspan=2, sticky="ew")
+
+        self.send_button = tk.Button(root, text="Send", command=self.send_frame)
         self.send_button.grid(row=6, column=0, columnspan=3, sticky="ew")
 
         root.grid_rowconfigure(3, weight=1)
@@ -266,16 +271,20 @@ class SerialDebuggerGUI:
             self.debugger.start()
             self.connect_button.config(text="Disconnect")
 
-    def send_data(self):
-        data = self.input_entry.get()
-        if self.debugger:
-            self.debugger.write_to_port(data)
-
-    def clear_treeview(self):
-        for item in self.treeview.get_children():
-            self.treeview.delete(item)
-        for item in self.data_treeview.get_children():
-            self.data_treeview.delete(item)
+    def send_frame(self):
+        frame_type = self.frame_send_combobox.get()
+        data = self.frame_send_input_entry.get()
+        data_bytes = bytes.fromhex(data.replace(" ", ""))
+        frame_len = len(data_bytes) + 8
+        if frame_type == "广播帧":
+            frame_len_hex = format(
+                frame_len, "02X"
+            )  # 将 frame_len 转换为 2 位十六进制字符串
+            frame_data = (
+                "A5 FF CC " + frame_len_hex + " 00 00 00 " + data_bytes.hex() + " 00"
+            )
+            if self.debugger:
+                self.debugger.write_to_port(frame_data)
 
     def on_resize(self, event):
         new_width = event.width - 300
