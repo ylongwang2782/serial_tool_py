@@ -228,15 +228,28 @@ class SerialDebuggerGUI:
         self.input_label = tk.Label(root, text="Send Data:")
         self.input_label.grid(row=5, column=0, sticky="ew")
 
-        self.frame_send_combobox = ttk.Combobox(root, values=["广播帧", "指令帧"])
+        self.frame_send_combobox = ttk.Combobox(root, values=["广播帧", "开启广播帧"])
         self.frame_send_combobox.grid(row=5, column=0, columnspan=1, sticky="ew")
         self.frame_send_combobox.set("广播帧")
 
         self.frame_send_input_entry = tk.Entry(root)
         self.frame_send_input_entry.grid(row=5, column=1, columnspan=2, sticky="ew")
+        self.frame_send_input_entry.insert(
+            0, "02 04 00 00 00 3F 20 02 00 00 00 40 41 02 00"
+        )
 
         self.send_button = tk.Button(root, text="Send", command=self.send_frame)
         self.send_button.grid(row=6, column=0, columnspan=3, sticky="ew")
+
+        self.cast_on_button = tk.Button(
+            root, text="开启广播", command=self.send_cast_on_cmd
+        )
+        self.cast_on_button.grid(row=7, column=0, columnspan=1, sticky="ew")
+
+        self.cast_off_button = tk.Button(
+            root, text="关闭广播", command=self.send_cast_off_cmd
+        )
+        self.cast_off_button.grid(row=7, column=1, columnspan=1, sticky="ew")
 
         root.grid_rowconfigure(3, weight=1)
         root.grid_rowconfigure(4, weight=1)
@@ -277,14 +290,22 @@ class SerialDebuggerGUI:
         data_bytes = bytes.fromhex(data.replace(" ", ""))
         frame_len = len(data_bytes) + 8
         if frame_type == "广播帧":
-            frame_len_hex = format(
-                frame_len, "02X"
-            )  # 将 frame_len 转换为 2 位十六进制字符串
+            frame_len_hex = format(frame_len, "02X")
             frame_data = (
                 "A5 FF CC " + frame_len_hex + " 00 00 00 " + data_bytes.hex() + " 00"
             )
             if self.debugger:
                 self.debugger.write_to_port(frame_data)
+
+    def send_cast_on_cmd(self):
+        cast_on_cmd_frm = "A5 FF CC 11 00 01 04 02 00 00 00 00 00 00 00 00 00 80"
+        if self.debugger:
+            self.debugger.write_to_port(cast_on_cmd_frm)
+
+    def send_cast_off_cmd(self):
+        cast_off_cmd_frm = "A5 FF CC 11 00 01 04 03 00 00 00 00 00 00 00 00 00 81"
+        if self.debugger:
+            self.debugger.write_to_port(cast_off_cmd_frm)
 
     def on_resize(self, event):
         new_width = event.width - 300

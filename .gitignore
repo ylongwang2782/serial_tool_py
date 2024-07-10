@@ -2,3 +2,4 @@ back.py
 serial_log.txt
 build/
 dist/
+serial_test_log.txt
